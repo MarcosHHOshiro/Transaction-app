@@ -4,7 +4,15 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
 export async function transactionsRoutes(app: FastifyInstance) {
-  app.get('/', async () => {
+  app.get('/', async (request, reply) => {
+    const sessionId = request.cookies.session_id
+
+    if (!sessionId) {
+      return reply.status(401).send({
+        error: 'Unauthorized',
+      })
+    }
+
     const transactions = await knex('transactions').select()
 
     return { transactions }
@@ -41,10 +49,22 @@ export async function transactionsRoutes(app: FastifyInstance) {
       request.body,
     )
 
+    let sessionId = request.cookies.sessionId
+
+    if (!sessionId) {
+      sessionId = randomUUID()
+
+      reply.cookie('sessionId', sessionId, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 1 dia
+      })
+    }
+
     await knex('transactions').insert({
       id: randomUUID(),
       title,
       amount: type === 'credit' ? amount : amount * -1,
+      session_id: sessionId,
     })
 
     return reply.status(201).send()
